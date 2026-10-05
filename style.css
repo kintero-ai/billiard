@@ -1,0 +1,245 @@
+:root {
+  --bg: #0c1712;
+  --panel: #13241b;
+  --panel-2: #1b3326;
+  --text: #eef3ee;
+  --muted: #9db4a6;
+  --accent: #f4c20d;
+  --accent-2: #2fbf71;
+  --danger: #e5484d;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid #000;
+  min-height: 52px;
+}
+
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  opacity: 0.6;
+  transition: opacity .2s, border-color .2s, background .2s;
+  min-width: 0;
+}
+.player.right { align-items: flex-end; text-align: right; }
+.player.active { opacity: 1; border-color: var(--accent); background: var(--panel-2); }
+.pname { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.chips { display: flex; gap: 3px; flex-wrap: wrap; min-height: 14px; }
+.chip {
+  width: 14px; height: 14px; border-radius: 50%;
+  box-shadow: inset -2px -2px 3px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.4);
+}
+.chip.gone { opacity: .18; }
+.open { font-size: 12px; color: var(--muted); }
+
+#hud > * { min-width: 0; }
+
+#msg {
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  max-width: 44vw;
+  line-height: 1.25;
+}
+
+.hud-btns { display: flex; gap: 6px; }
+.hud-btns button {
+  width: 40px; height: 40px;
+  border: none; border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 20px;
+}
+.hud-btns button:hover { background: #24453a; }
+
+/* ---------- Игровая зона ---------- */
+#game {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+#stage { flex: 1; position: relative; min-width: 0; min-height: 0; }
+#table { position: absolute; inset: 0; display: block; cursor: crosshair; }
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  width: 76px;
+  background: var(--panel);
+}
+
+.rot {
+  width: 56px; height: 56px;
+  border: none; border-radius: 50%;
+  background: var(--panel-2);
+  font-size: 26px;
+  touch-action: none;
+}
+.rot:active { background: #2a5242; }
+
+#power {
+  --p: 0;
+  position: relative;
+  flex: 1;
+  width: 44px;
+  border-radius: 22px;
+  background: #0a120e;
+  border: 2px solid #2a4a3a;
+  overflow: hidden;
+  touch-action: none;
+  cursor: ns-resize;
+}
+#powerFill {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: calc(var(--p) * 100%);
+  background: linear-gradient(#2fbf71, #f4c20d 60%, #e5484d);
+}
+#powerLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  letter-spacing: 4px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* Портрет: стол поворачивается, управление — снизу */
+@media (orientation: portrait) {
+  #game { flex-direction: column; }
+  #controls { flex-direction: row; width: auto; height: 76px; padding: 8px 12px; }
+  #power { height: 44px; width: auto; cursor: ew-resize; }
+  #powerFill {
+    top: 0; bottom: 0; right: auto;
+    height: auto;
+    width: calc(var(--p) * 100%);
+    background: linear-gradient(90deg, #2fbf71, #f4c20d 60%, #e5484d);
+  }
+  #powerLabel { writing-mode: horizontal-tb; }
+  #hud { grid-template-columns: 1fr 1fr auto; }
+  #msg { grid-column: 1 / -1; grid-row: 2; max-width: none; font-size: 14px; }
+}
+
+@media (max-height: 460px) {
+  #hud { min-height: 40px; padding: 3px 10px; }
+  .pname { font-size: 13px; }
+  .chip { width: 11px; height: 11px; }
+  #msg { font-size: 13px; }
+  .hud-btns button { width: 34px; height: 34px; font-size: 17px; }
+  #controls { width: 64px; padding: 6px; gap: 6px; }
+  .rot { width: 48px; height: 48px; font-size: 22px; }
+}
+
+/* ---------- Оверлеи ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 12, 8, 0.82);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  touch-action: auto;
+  overflow-y: auto;
+}
+.hidden { display: none !important; }
+
+.card {
+  width: min(420px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid #2a4a3a;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  user-select: text;
+}
+.logo {
+  width: 64px; height: 64px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #555, #111 60%);
+  display: grid; place-items: center;
+  font: 800 22px system-ui, sans-serif;
+  color: #111;
+  position: relative;
+}
+.logo::before {
+  content: "";
+  position: absolute;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: #fff;
+}
+.logo { isolation: isolate; }
+.logo::before { z-index: -1; }
+h1 { margin: 4px 0 2px; font-size: 30px; }
+h2 { margin: 4px 0 8px; font-size: 26px; }
+.sub, #overText { color: var(--muted); margin: 0 0 16px; }
+
+.big {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent-2);
+  color: #04140b;
+  font-size: 17px;
+  font-weight: 700;
+}
+.big:hover { filter: brightness(1.08); }
+.big.alt { background: var(--panel-2); color: var(--text); }
+
+.help { text-align: left; margin-top: 12px; color: var(--muted); font-size: 14px; }
+.help summary { cursor: pointer; color: var(--text); text-align: center; }
+.help ul { padding-left: 18px; margin: 10px 0 0; }
+.help li { margin: 6px 0; line-height: 1.35; }
