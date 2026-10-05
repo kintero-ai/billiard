@@ -2,7 +2,7 @@
 
 Браузерная игра «Американский пул — восьмёрка» для ПК и смартфона. Без установки и зависимостей: чистый HTML5 Canvas + JavaScript.
 
-**Играть:** https://<ваш-ник>.github.io/billiard/ (после включения GitHub Pages)  
+**Играть:** https://kintero-ai.github.io/billiard/  
 или просто откройте `index.html` в браузере.
 
 ## Режимы
