@@ -45,14 +45,26 @@ function createRack() {
   return balls;
 }
 
-class Match {
-  constructor(mode) {
+// «Вы забили» / «Компьютер забивает».
+function scores(p) {
+  return p.name === 'Вы' ? 'Вы забили' : `${p.name} забивает`;
+}
+
+function makePlayers(mode, extra) {
+  const list = mode === 'ai'
+    ? [{ name: 'Вы', ai: false }, { name: 'Компьютер', ai: true }]
+    : [{ name: 'Игрок 1', ai: false }, { name: 'Игрок 2', ai: false }];
+  return list.map(p => Object.assign(p, extra()));
+}
+
+// Общее для всех видов игры. cue — шар, которым бьёт игрок (striker).
+class BaseMatch {
+  constructor(mode, balls, players) {
     this.mode = mode;
-    this.players = mode === 'ai'
-      ? [{ name: 'Вы', ai: false, group: null }, { name: 'Компьютер', ai: true, group: null }]
-      : [{ name: 'Игрок 1', ai: false, group: null }, { name: 'Игрок 2', ai: false, group: null }];
+    this.players = players;
     this.cur = 0;
-    this.balls = createRack();
+    this.balls = balls;
+    this.striker = 0;
     this.ballInHand = true;
     this.headString = true;
     this.isBreak = true;
@@ -63,6 +75,7 @@ class Match {
   }
 
   get player() { return this.players[this.cur]; }
+  get cue() { return this.balls[this.striker]; }
 
   resetShot() {
     this.shot = { firstHit: null, pocketed: [] };
@@ -75,31 +88,19 @@ class Match {
 
   onHit(a, b) {
     if (this.shot.firstHit !== null) return;
-    if (a.n === 0) this.shot.firstHit = b.n;
-    else if (b.n === 0) this.shot.firstHit = a.n;
+    if (a.n === this.striker) this.shot.firstHit = b.n;
+    else if (b.n === this.striker) this.shot.firstHit = a.n;
   }
 
   onPocket(b) {
     this.shot.pocketed.push(b.n);
   }
 
-  remaining(group) {
-    return this.balls.filter(b => b.on && groupOf(b.n) === group).map(b => b.n);
-  }
-
-  // Шары, по которым игрок может бить первым.
-  targetsFor(idx) {
-    const p = this.players[idx];
-    if (!p.group) return this.balls.filter(b => b.on && b.n !== 0 && b.n !== 8).map(b => b.n);
-    const rest = this.remaining(p.group);
-    return rest.length ? rest : [8];
-  }
-
   canPlaceCue(x, y) {
     const { W, H, R } = TABLE;
     if (x < R || x > W - R || y < R || y > H - R) return false;
     if (this.headString && x > W / 4) return false;
-    return this.balls.every(b => b.n === 0 || !b.on || Math.hypot(b.x - x, b.y - y) >= 2 * R + 0.5);
+    return this.isFree(x, y, this.cue);
   }
 
   isFree(x, y, except) {
@@ -118,6 +119,25 @@ class Match {
         }
       }
     }
+  }
+}
+
+class Match extends BaseMatch {
+  constructor(mode) {
+    super(mode, createRack(), makePlayers(mode, () => ({ group: null })));
+    this.kind = 'pool';
+  }
+
+  remaining(group) {
+    return this.balls.filter(b => b.on && groupOf(b.n) === group).map(b => b.n);
+  }
+
+  // Шары, по которым игрок может бить первым.
+  targetsFor(idx) {
+    const p = this.players[idx];
+    if (!p.group) return this.balls.filter(b => b.on && b.n !== 0 && b.n !== 8).map(b => b.n);
+    const rest = this.remaining(p.group);
+    return rest.length ? rest : [8];
   }
 
   evaluate() {
@@ -146,7 +166,7 @@ class Match {
         this.over = true;
         this.winner = win ? this.cur : oppIdx;
         this.msg = win
-          ? `${p.name} забивает восьмёрку!`
+          ? `${scores(p)} восьмёрку!`
           : (foul ? `Фол при забитой восьмёрке (${foul.toLowerCase()})` : 'Восьмёрка забита раньше времени');
         return;
       }
@@ -179,5 +199,94 @@ class Match {
       this.msg = `Ход: ${opp.name}`;
     }
     this.headString = false;
+  }
+}
+
+// ---------- Русский бильярд: «Американка» ----------
+const RU_TARGET = 8;
+
+// 15 шаров пирамидой, вершина — на задней отметке; 16-й (биток, без номера) — в «доме».
+function createRussianRack() {
+  const { W, H, R } = TABLE;
+  const order = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  const balls = [];
+  balls[0] = new Ball(0, W / 4, H / 2);
+  const ax = W * 0.75, dx = R * Math.sqrt(3) + 0.3;
+  let k = 0;
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j <= i; j++) {
+      const n = order[k++];
+      balls[n] = new Ball(n, ax + i * dx, H / 2 + (j - i / 2) * (2 * R + 0.3));
+    }
+  }
+  return balls;
+}
+
+// Бить можно любым шаром по любому, засчитывается любой забитый шар (и биток-«свояк»).
+// Промах (биток никого не задел) — фол: забитое в этом ударе возвращается,
+// с нарушителя снимается один шар, ход переходит сопернику. Кто первым забил 8 — победил.
+class RussianMatch extends BaseMatch {
+  constructor(mode) {
+    super(mode, createRussianRack(), makePlayers(mode, () => ({ score: 0, potted: [] })));
+    this.kind = 'russian';
+  }
+
+  // Любой шар на столе, кроме битка.
+  targetsFor() {
+    return this.balls.filter(b => b.on && b.n !== this.striker).map(b => b.n);
+  }
+
+  ballName(n) {
+    return n === 0 ? 'биток' : `шар ${n}`;
+  }
+
+  // Если выбранный биток ушёл в лузу — выбираем шар ближе всего к «дому».
+  ensureStriker() {
+    if (this.cue.on) return;
+    let best = null, bd = Infinity;
+    for (const b of this.balls) {
+      if (!b.on) continue;
+      const d = Math.hypot(b.x - TABLE.W / 4, b.y - TABLE.H / 2);
+      if (d < bd) { bd = d; best = b; }
+    }
+    if (best) this.striker = best.n;
+  }
+
+  evaluate() {
+    const { W, H } = TABLE;
+    const p = this.player;
+    const oppIdx = 1 - this.cur;
+    const opp = this.players[oppIdx];
+    const { firstHit, pocketed } = this.shot;
+    this.isBreak = false;
+    this.headString = false;
+
+    if (firstHit === null) {
+      for (const n of pocketed) this.spot(this.balls[n], W * 0.75, H / 2);
+      let pen = '';
+      if (p.potted.length) {
+        const n = p.potted.pop();
+        p.score--;
+        this.spot(this.balls[n], W * 0.75, H / 2);
+        pen = ' Штрафной шар вернулся на стол.';
+      }
+      this.cur = oppIdx;
+      this.msg = `Фол: ${this.ballName(this.striker)} никого не задел.${pen} Ход: ${opp.name}`;
+    } else if (pocketed.length) {
+      p.score += pocketed.length;
+      p.potted.push(...pocketed);
+      if (p.score >= RU_TARGET) {
+        this.over = true;
+        this.winner = this.cur;
+        this.msg = `${scores(p)} ${RU_TARGET}-й шар!`;
+        return;
+      }
+      const sv = pocketed.includes(this.striker) ? ' (свояк)' : '';
+      this.msg = `${p.name}: +${pocketed.length}${sv}, всего ${p.score} из ${RU_TARGET}. Ещё удар`;
+    } else {
+      this.cur = oppIdx;
+      this.msg = `Ход: ${opp.name}`;
+    }
+    this.ensureStriker();
   }
 }

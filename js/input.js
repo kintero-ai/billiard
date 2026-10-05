@@ -1,19 +1,42 @@
 'use strict';
 
 // Управление мышью, касаниями и клавиатурой.
-// game: { G, toLogical(e), shoot(power), canAim() }
+// game: { G, toLogical(e), shoot(power), canAim(), updateHud() }
 function setupInput(canvas, game) {
   const { G } = game;
   let mode = null, start = null;
+  let lastTap = { n: -1, t: 0 };
+
+  // «Американка»: шар под указателем, который можно сделать битком.
+  function ballAt(p) {
+    let best = null, bd = TABLE.R * 1.8;
+    for (const b of G.match.balls) {
+      if (!b.on) continue;
+      const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+
+  function setPicking(on) {
+    G.selecting = on;
+    document.body.classList.toggle('picking', on);
+    game.updateHud();
+  }
+
+  function pickStriker(b) {
+    G.match.striker = b.n;
+    setPicking(false);
+  }
 
   function setAimTo(p) {
-    const cue = G.match.balls[0];
+    const cue = G.match.cue;
     const dx = p.x - cue.x, dy = p.y - cue.y;
     if (Math.hypot(dx, dy) > TABLE.R * 0.8) G.aim = Math.atan2(dy, dx);
   }
 
   function moveCue(p) {
-    const m = G.match, cue = m.balls[0];
+    const m = G.match, cue = m.cue;
     const { W, H, R } = TABLE;
     const x = Math.max(R, Math.min(m.headString ? W / 4 : W - R, p.x));
     const y = Math.max(R, Math.min(H - R, p.y));
@@ -25,9 +48,17 @@ function setupInput(canvas, game) {
     if (!game.canAim()) return;
     e.preventDefault();
     const p = game.toLogical(e);
-    const cue = G.match.balls[0];
+    const m = G.match, cue = m.cue;
+    if (m.kind === 'russian' && !m.ballInHand) {
+      const b = ballAt(p);
+      const now = performance.now();
+      const dbl = b && lastTap.n === b.n && now - lastTap.t < 350;
+      lastTap = { n: b ? b.n : -1, t: now };
+      if (b && (G.selecting || dbl) && b !== cue) { pickStriker(b); return; }
+      if (G.selecting) return;
+    }
     canvas.setPointerCapture(e.pointerId);
-    if (G.match.ballInHand && Math.hypot(p.x - cue.x, p.y - cue.y) < TABLE.R * 3.5) {
+    if (m.ballInHand && Math.hypot(p.x - cue.x, p.y - cue.y) < TABLE.R * 3.5) {
       mode = 'drag';
     } else if (e.pointerType === 'mouse') {
       mode = 'pull';
@@ -102,6 +133,10 @@ function setupInput(canvas, game) {
     });
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, stop);
   }
+  document.getElementById('pickBtn').addEventListener('click', () => {
+    if (game.canAim() && G.match.kind === 'russian' && !G.match.ballInHand) setPicking(!G.selecting);
+  });
+
   holdRotate(document.getElementById('rotL'), -1);
   holdRotate(document.getElementById('rotR'), 1);
 

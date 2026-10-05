@@ -1,32 +1,44 @@
 'use strict';
 
-// Игровое поле в логических единицах: 1000 x 500 (сукно), шар радиуса 12.
-const TABLE = { W: 1000, H: 500, R: 12, RAIL: 46, CG: 30, MG: 22 };
+// Игровое поле в логических единицах: 1000 x 500 (сукно).
+// Размер шаров и луз зависит от вида стола (setTableKind).
+const TABLE = { W: 1000, H: 500, R: 12, RAIL: 46, CG: 30, MG: 22, kind: 'pool' };
 const PHYS = { decel: 200, damp: 0.5, ballE: 0.95, railE: 0.75, maxSpeed: 2300, step: 1 / 120 };
 
-// Лузы: x,y,r — центр и радиус отверстия; ax,ay — точка прицеливания для ИИ.
-const POCKETS = (() => {
-  const { W, H } = TABLE;
-  return [
-    { x: -6, y: -6, r: 26, ax: 0, ay: 0 },
-    { x: W / 2, y: -12, r: 22, ax: W / 2, ay: -4, side: true },
-    { x: W + 6, y: -6, r: 26, ax: W, ay: 0 },
-    { x: -6, y: H + 6, r: 26, ax: 0, ay: H },
-    { x: W / 2, y: H + 12, r: 22, ax: W / 2, ay: H + 4, side: true },
-    { x: W + 6, y: H + 6, r: 26, ax: W, ay: H },
-  ];
-})();
+// Пул: широкие лузы. Русский бильярд: шары меньше относительно стола, лузы чуть шире шара.
+const TABLE_KINDS = {
+  pool: { R: 12, CG: 30, MG: 22, cornerOff: 6, cornerR: 26, sideOff: 12, sideR: 22 },
+  russian: { R: 10, CG: 19, MG: 14, cornerOff: 3, cornerR: 18, sideOff: 9, sideR: 15 },
+};
 
+// Лузы: x,y,r — центр и радиус отверстия; ax,ay — точка прицеливания для ИИ.
+const POCKETS = [];
 // Губки луз — точки, от которых шары отскакивают.
-const JAWS = (() => {
+const JAWS = [];
+
+function setTableKind(kind) {
+  const k = TABLE_KINDS[kind];
+  Object.assign(TABLE, { R: k.R, CG: k.CG, MG: k.MG, kind });
   const { W, H, CG, MG } = TABLE;
-  return [
+  const co = k.cornerOff, so = k.sideOff;
+  POCKETS.length = 0;
+  POCKETS.push(
+    { x: -co, y: -co, r: k.cornerR, ax: 0, ay: 0 },
+    { x: W / 2, y: -so, r: k.sideR, ax: W / 2, ay: -so / 3, side: true },
+    { x: W + co, y: -co, r: k.cornerR, ax: W, ay: 0 },
+    { x: -co, y: H + co, r: k.cornerR, ax: 0, ay: H },
+    { x: W / 2, y: H + so, r: k.sideR, ax: W / 2, ay: H + so / 3, side: true },
+    { x: W + co, y: H + co, r: k.cornerR, ax: W, ay: H },
+  );
+  JAWS.length = 0;
+  JAWS.push(
     { x: CG, y: 0 }, { x: 0, y: CG }, { x: W - CG, y: 0 }, { x: W, y: CG },
     { x: CG, y: H }, { x: 0, y: H - CG }, { x: W - CG, y: H }, { x: W, y: H - CG },
     { x: W / 2 - MG, y: 0 }, { x: W / 2 + MG, y: 0 },
     { x: W / 2 - MG, y: H }, { x: W / 2 + MG, y: H },
-  ];
-})();
+  );
+}
+setTableKind('pool');
 
 class Ball {
   constructor(n, x, y) {

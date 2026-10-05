@@ -28,6 +28,8 @@ const Sound = {
 const G = {
   phase: 'menu', // menu | aim | moving | ai-think | ai-aim | over
   mode: null,
+  game: 'pool', // pool | russian
+  selecting: false,
   match: null,
   aim: 0,
   power: 0,
@@ -81,7 +83,7 @@ const physEvents = {
 };
 
 function shoot(power) {
-  const m = G.match, cue = m.balls[0];
+  const m = G.match, cue = m.cue;
   if (m.ballInHand && !m.canPlaceCue(cue.x, cue.y)) return;
   if (!isFinite(G.aim) || !isFinite(power)) return;
   Sound.init();
@@ -100,8 +102,8 @@ function shoot(power) {
 function endShot() {
   const m = G.match;
   m.evaluate();
-  const cue = m.balls[0];
-  if (!m.over && (!cue.on || !isFinite(cue.x) || !isFinite(cue.y))) {
+  const cue = m.cue;
+  if (!m.over && m.kind === 'pool' && (!cue.on || !isFinite(cue.x) || !isFinite(cue.y))) {
     m.spot(cue, TABLE.W / 4, TABLE.H / 2);
     m.ballInHand = true;
   }
@@ -116,6 +118,8 @@ function nextTurn() {
     setTimeout(showOver, 700);
     return;
   }
+  G.selecting = false;
+  document.body.classList.remove('picking');
   if (m.player.ai) {
     G.phase = 'ai-think';
     G.ai = { timer: 0.7 };
@@ -136,10 +140,12 @@ function updateAI(dt) {
   ai.timer -= dt;
   if (G.phase === 'ai-think') {
     if (ai.timer > 0) return;
-    const plan = AI.plan(G.match);
+    const m = G.match;
+    const plan = AI.plan(m);
+    m.striker = plan.striker;
     if (plan.place) {
-      G.match.balls[0].x = plan.place.x;
-      G.match.balls[0].y = plan.place.y;
+      m.cue.x = plan.place.x;
+      m.cue.y = plan.place.y;
     }
     G.ai = { plan, from: G.aim, t: 0, timer: 0 };
     G.phase = 'ai-aim';
@@ -164,12 +170,14 @@ function draw() {
   Render.table(ctx);
   const m = G.match;
   if (!m) return;
-  const cue = m.balls[0];
+  const cue = m.cue;
   const aiming = G.phase === 'aim' || G.phase === 'ai-aim';
   if (aiming && m.ballInHand && m.headString) Render.headLine(ctx);
-  if (aiming && cue.on) Render.aim(ctx, m.balls, G.aim);
+  if (aiming && cue.on) Render.aim(ctx, m.balls, cue, G.aim);
   for (const b of m.balls) if (b.on) Render.ball(ctx, b);
+  if (G.selecting) for (const b of m.balls) if (b.on && b !== cue) Render.pickRing(ctx, b);
   if (aiming && cue.on) {
+    if (m.kind === 'russian') Render.strikerRing(ctx, cue);
     if (m.ballInHand && G.phase === 'aim') Render.handRing(ctx, cue, m.canPlaceCue(cue.x, cue.y));
     Render.cue(ctx, cue, G.aim, G.power * 90);
   }
@@ -183,6 +191,7 @@ const hud = {
 };
 
 function chip(n, gone) {
+  if (TABLE.kind === 'russian') return `<span class="chip ivory${gone ? ' gone' : ''}"></span>`;
   const c = ballColor(n);
   const bg = n > 8
     ? `linear-gradient(#f7f4ea 0 26%, ${c} 26% 74%, #f7f4ea 74%)`
@@ -198,7 +207,10 @@ function updateHud() {
     el.classList.toggle('active', i === m.cur && !m.over);
     el.querySelector('.pname').textContent = p.name;
     let html = '';
-    if (p.group) {
+    if (m.kind === 'russian') {
+      for (let k = 0; k < RU_TARGET; k++) html += chip(0, k >= p.score);
+      html += `<span class="score">${p.score}/${RU_TARGET}</span>`;
+    } else if (p.group) {
       const nums = p.group === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : [9, 10, 11, 12, 13, 14, 15];
       html = nums.map(n => chip(n, !m.balls[n].on)).join('');
       if (m.remaining(p.group).length === 0) html += chip(8, false);
@@ -210,6 +222,8 @@ function updateHud() {
   let text = m.msg;
   if (!m.over && G.phase !== 'moving' && m.ballInHand && !m.player.ai) {
     text += m.isBreak ? ' — поставьте биток и ударьте' : ' (перетащите биток)';
+  } else if (!m.over && G.phase === 'aim' && m.kind === 'russian' && !m.player.ai) {
+    text += G.selecting ? ' — коснитесь шара, которым будете бить' : '';
   }
   hud.msg.textContent = text;
 }
@@ -220,9 +234,17 @@ const menuEl = document.getElementById('menu');
 const overEl = document.getElementById('over');
 const resumeBtn = document.getElementById('resumeBtn');
 
+function setGame(game) {
+  G.game = game;
+  document.body.classList.toggle('ru', game === 'russian');
+  document.querySelectorAll('[data-game]').forEach(b => b.classList.toggle('on', b.dataset.game === game));
+  try { localStorage.setItem('billiard-game', game); } catch (e) { /* нет хранилища */ }
+}
+
 function startGame(mode) {
   G.mode = mode;
-  G.match = new Match(mode);
+  setTableKind(G.game);
+  G.match = G.game === 'russian' ? new RussianMatch(mode) : new Match(mode);
   G.aim = 0;
   G.power = 0;
   menuEl.classList.add('hidden');
@@ -240,14 +262,21 @@ function showOver() {
   overEl.classList.remove('hidden');
 }
 
+document.querySelectorAll('[data-game]').forEach(btn => {
+  btn.addEventListener('click', () => setGame(btn.dataset.game));
+});
 document.querySelectorAll('[data-mode]').forEach(btn => {
   btn.addEventListener('click', () => { Sound.init(); startGame(btn.dataset.mode); });
 });
 document.getElementById('menuBtn').addEventListener('click', () => {
   resumeBtn.classList.toggle('hidden', !G.match || G.match.over);
+  if (G.match) setGame(G.match.kind);
   menuEl.classList.remove('hidden');
 });
-resumeBtn.addEventListener('click', () => menuEl.classList.add('hidden'));
+resumeBtn.addEventListener('click', () => {
+  if (G.match) setGame(G.match.kind);
+  menuEl.classList.add('hidden');
+});
 document.getElementById('againBtn').addEventListener('click', () => startGame(G.mode));
 document.getElementById('toMenuBtn').addEventListener('click', () => {
   overEl.classList.add('hidden');
@@ -289,5 +318,8 @@ function frame(t) {
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(stage);
 resize();
-setupInput(canvas, { G, toLogical, shoot, canAim });
+let savedGame = 'pool';
+try { savedGame = localStorage.getItem('billiard-game') || 'pool'; } catch (e) { /* нет хранилища */ }
+setGame(savedGame === 'russian' ? 'russian' : 'pool');
+setupInput(canvas, { G, toLogical, shoot, canAim, updateHud });
 requestAnimationFrame(frame);

@@ -97,7 +97,18 @@ const Render = {
     ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.save();
     ctx.clip();
-    if (b.n > 8) {
+    if (TABLE.kind === 'russian') {
+      // Русский бильярд: все шары цвета слоновой кости, номер прямо на шаре.
+      ctx.fillStyle = '#f1e6c8';
+      ctx.fillRect(-R, -R, 2 * R, 2 * R);
+      if (b.n > 0) {
+        ctx.fillStyle = '#2a1d10';
+        ctx.font = `bold ${R * 0.95}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(b.n), 0, R * 0.06);
+      }
+    } else if (b.n > 8) {
       ctx.fillStyle = '#f7f4ea';
       ctx.fillRect(-R, -R, 2 * R, 2 * R);
       ctx.fillStyle = ballColor(b.n);
@@ -106,7 +117,7 @@ const Render = {
       ctx.fillStyle = ballColor(b.n);
       ctx.fillRect(-R, -R, 2 * R, 2 * R);
     }
-    if (b.n > 0) {
+    if (b.n > 0 && TABLE.kind !== 'russian') {
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(0, 0, R * 0.5, 0, Math.PI * 2);
@@ -128,13 +139,12 @@ const Render = {
   },
 
   // Линия прицела с «призрачным» шаром и направлениями после удара.
-  aim(ctx, balls, angle) {
+  aim(ctx, balls, cue, angle) {
     const { R, W, H } = TABLE;
-    const cue = balls[0];
     const dx = Math.cos(angle), dy = Math.sin(angle);
     let tMin = Infinity, hit = null;
     for (const b of balls) {
-      if (!b.on || b.n === 0) continue;
+      if (!b.on || b === cue) continue;
       const fx = cue.x - b.x, fy = cue.y - b.y;
       const bq = fx * dx + fy * dy;
       const c = fx * fx + fy * fy - 4 * R * R;
@@ -231,6 +241,29 @@ const Render = {
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.arc(cueBall.x, cueBall.y, TABLE.R * 2.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // Выбранный шар-биток в «Американке».
+  strikerRing(ctx, b) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(244,194,13,0.95)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, TABLE.R + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // Шары, которые можно выбрать битком.
+  pickRing(ctx, b) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+    ctx.save();
+    ctx.strokeStyle = `rgba(120,200,255,${0.4 + 0.5 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, TABLE.R + 3 + pulse * 2, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   },
