@@ -97,6 +97,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #stage { flex: 1; position: relative; min-width: 0; min-height: 0; }
 #table { position: absolute; inset: 0; display: block; cursor: crosshair; }
 
+#tip {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 24px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(8, 16, 12, 0.88);
+  border: 1px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.tip-touch { display: none; }
+@media (pointer: coarse) {
+  .tip-mouse { display: none; }
+  .tip-touch { display: block; }
+}
+
 #controls {
   display: flex;
   flex-direction: column;

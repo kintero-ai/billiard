@@ -23,7 +23,19 @@
       </div>
     </header>
     <main id="game">
-      <div id="stage"><canvas id="table"></canvas></div>
+      <div id="stage">
+        <canvas id="table"></canvas>
+        <div id="tip" class="hidden">
+          <div class="tip-mouse">
+            <b>Как ударить:</b> наведите мышь — белая пунктирная линия покажет, куда пойдёт биток.
+            Зажмите левую кнопку, <b>оттяните мышь назад</b> (чем дальше — тем сильнее) и отпустите.
+          </div>
+          <div class="tip-touch">
+            <b>Как ударить:</b> коснитесь стола там, куда хотите бить, — появится линия прицела.
+            ⟲ ⟳ — точная доводка. Затем <b>проведите пальцем по полосе «СИЛА»</b> и отпустите.
+          </div>
+        </div>
+      </div>
       <div id="controls">
         <button id="rotL" class="rot" aria-label="Повернуть прицел влево">⟲</button>
         <div id="power"><div id="powerFill"></div><span id="powerLabel">СИЛА</span></div>

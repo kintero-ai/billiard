@@ -74,18 +74,23 @@ const physEvents = {
     Sound.play(1500 + Math.random() * 300, v / 1500, 0.05);
   },
   rail(b, v) { Sound.play(220, v / 2500, 0.07, 'sine'); },
-  pocket() { Sound.play(120, 0.6, 0.25, 'sine'); },
+  pocket(b) {
+    G.match.onPocket(b);
+    Sound.play(120, 0.6, 0.25, 'sine');
+  },
 };
 
 function shoot(power) {
   const m = G.match, cue = m.balls[0];
   if (m.ballInHand && !m.canPlaceCue(cue.x, cue.y)) return;
+  if (!isFinite(G.aim) || !isFinite(power)) return;
   Sound.init();
   m.beginShot();
   const sp = PHYS.maxSpeed * Math.pow(power, 1.4);
   cue.vx = Math.cos(G.aim) * sp;
   cue.vy = Math.sin(G.aim) * sp;
   Sound.play(900, 0.3 + power * 0.7, 0.04);
+  tipEl.classList.add('hidden');
   G.power = 0;
   G.phase = 'moving';
   G.moveTime = 0;
@@ -93,7 +98,13 @@ function shoot(power) {
 }
 
 function endShot() {
-  G.match.evaluate();
+  const m = G.match;
+  m.evaluate();
+  const cue = m.balls[0];
+  if (!m.over && (!cue.on || !isFinite(cue.x) || !isFinite(cue.y))) {
+    m.spot(cue, TABLE.W / 4, TABLE.H / 2);
+    m.ballInHand = true;
+  }
   nextTurn();
 }
 
@@ -204,6 +215,7 @@ function updateHud() {
 }
 
 // ---------- Меню ----------
+const tipEl = document.getElementById('tip');
 const menuEl = document.getElementById('menu');
 const overEl = document.getElementById('over');
 const resumeBtn = document.getElementById('resumeBtn');
@@ -215,6 +227,7 @@ function startGame(mode) {
   G.power = 0;
   menuEl.classList.add('hidden');
   overEl.classList.add('hidden');
+  tipEl.classList.remove('hidden');
   nextTurn();
 }
 
